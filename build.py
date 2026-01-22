@@ -84,6 +84,13 @@ def clean_element_links(element, force_root=False):
 
     for tag in element.find_all(['a', 'link', 'img', 'script']):
         if tag.has_attr('href'):
+            # Fix Twitter help links to X.com to avoid redirects/errors
+            if 'help.twitter.com' in tag['href']:
+                tag['href'] = tag['href'].replace('help.twitter.com', 'help.x.com')
+                # Fix old appeal links
+                if 'forms/general?subtopic=suspended' in tag['href']:
+                     tag['href'] = 'https://help.x.com/en/forms/account-access/appeals'
+
             tag['href'] = clean_link(tag['href'], force_root)
             
             # Auto-add rel attributes for external links and soft routes
@@ -377,7 +384,7 @@ def generate_recommendations(articles, current_url):
     selected = random.sample(candidates, min(3, len(candidates)))
     
     html = '<div class="mt-12 pt-8 border-t border-white/10">\n'
-    html += '    <h3 class="text-xl font-bold text-white mb-6">推荐阅读</h3>\n'
+    html += '    <h3 class="text-xl font-bold text-white mb-6">相关阅读</h3>\n'
     html += '    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">\n'
     
     for art in selected:
@@ -400,7 +407,11 @@ def inject_recommendations(soup, rec_html):
     article = soup.find('article')
     if article:
         for div in article.find_all('div', recursive=False):
-            if div.find('h3', string=re.compile("推荐阅读|Related|Recommended")):
+            # Safety check: Never delete the main content div (prose)
+            if div.get('class') and any('prose' in c for c in div.get('class')):
+                continue
+
+            if div.find('h3', string=re.compile("推荐阅读|相关阅读|Related|Recommended")):
                 div.decompose()
         
         rec_soup = BeautifulSoup(rec_html, 'html.parser')
