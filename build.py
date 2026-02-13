@@ -49,16 +49,30 @@ def clean_link(url, force_root=False):
         parsed = urlparse(url)
         path = parsed.path
         
-        # If path ends with .html, strip it
-        if path.endswith('.html'):
+        # Smart cleanup for .html and index
+        if path.endswith('/index.html'):
+            path = path[:-10] # /blog/index.html -> /blog/
+        elif path == 'index.html':
+            path = '' # index.html -> empty (will become / if forced)
+        elif path.endswith('.html'):
             path = path[:-5]
         
         # Ensure root relative for internal paths if requested
-        if force_root and path and not path.startswith('/'):
-            path = '/' + path
-            
+        if force_root:
+            if not path.startswith('/'):
+                path = '/' + path
+        
         # Reassemble
         new_url = path
+        if not new_url and not parsed.query and not parsed.fragment:
+             # If everything is empty but we had a path (like index.html), return /
+             if force_root:
+                 return '/'
+             return './' # or just empty? usually / is better for index
+
+        if force_root and new_url == '':
+            new_url = '/'
+
         if parsed.query:
             new_url += '?' + parsed.query
         if parsed.fragment:
@@ -540,6 +554,57 @@ def update_blog_index(articles, header, footer, favicons):
 
     write_file(BLOG_INDEX_PATH, str(soup))
 
+def generate_sitemap(articles):
+    """Generate sitemap.xml with clean URLs."""
+    print("Generating sitemap.xml...")
+    
+    # Base URL
+    base_url = "https://x-mai.top"
+    
+    # Static pages
+    static_pages = [
+        {'loc': '/', 'priority': '1.0', 'changefreq': 'daily'},
+        {'loc': '/legal', 'priority': '0.3', 'changefreq': 'monthly'},
+        {'loc': '/blog/', 'priority': '0.8', 'changefreq': 'weekly'},
+    ]
+    
+    # Blog posts
+    for art in articles:
+        # art['url'] is already clean (e.g., /blog/post)
+        url = art['url']
+        if not url.startswith('/'):
+            url = '/' + url
+            
+        static_pages.append({
+            'loc': url,
+            'priority': '0.7',
+            'changefreq': 'monthly',
+            'lastmod': art['date'].replace('.', '-')
+        })
+
+    # Generate XML
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    
+    today = datetime.now().strftime('%Y-%m-%d')
+    
+    for page in static_pages:
+        loc = base_url + page['loc']
+        lastmod = page.get('lastmod', today)
+        
+        xml += '  <url>\n'
+        xml += f'    <loc>{loc}</loc>\n'
+        xml += f'    <lastmod>{lastmod}</lastmod>\n'
+        xml += f'    <changefreq>{page["changefreq"]}</changefreq>\n'
+        xml += f'    <priority>{page["priority"]}</priority>\n'
+        xml += '  </url>\n'
+        
+    xml += '</urlset>'
+    
+    sitemap_path = os.path.join(BASE_DIR, 'sitemap.xml')
+    write_file(sitemap_path, xml)
+    print(f"Sitemap generated at {sitemap_path}")
+
 def main():
     print("Phase 1: Smart Extraction from index.html...")
     index_content = read_file(INDEX_PATH)
@@ -583,6 +648,8 @@ def main():
     write_file(INDEX_PATH, str(index_soup))
     
     update_blog_index(articles, copy.copy(header), copy.copy(footer), favicons)
+    
+    generate_sitemap(articles)
     
     print("Build Complete!")
 
