@@ -21,7 +21,7 @@ class SEOAudit:
         self.pages_data = {}  # path -> {title, h1_count, has_schema, has_breadcrumb}
         self.score = 100
         self.base_url = None
-        self.ignore_paths = {'.git', 'node_modules', '__pycache__', '.vscode', '.idea'}
+        self.ignore_paths = {'.git', 'node_modules', '__pycache__', '.vscode', '.idea', 'MasterTool'}
         self.ignore_urls_start = ('/go/', 'cdn-cgi', 'javascript:', 'mailto:', '#', 'tel:')
         self.ignore_files_contain = ('google', '404.html')
         self.issues = [] # List of dicts {type, message, file, deduct}
